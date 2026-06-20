@@ -1,1 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Himanshu Yadav — Orbit</title>
+<style>
+  :root{
+    --void:#03040a;
+    --space:#070a14;
+    --ink:#eef1f7;
+    --mist:#8d97ad;
+    --accent:#5fc8ff;
+    --amber:#d9b46a;
+    --violet:#8a7fcf;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    background:var(--void);
+    color:var(--ink);
+    font-family: Georgia, 'Iowan Old Style', serif;
+    overflow-x:hidden;
+  }
+  body{ height:300vh; } /* exactly 3 stages × 100vh — must match section count */
 
+  /* ============ CANVAS ============ */
+  #scene{
+    position:fixed; inset:0;
+    width:100%; height:100%;
+    display:block;
+  }
+
+  /* ============ TOP IDENTITY ============ */
+  .brand{
+    position:fixed; top:36px; left:48px; z-index:30;
+    font-size:14px; letter-spacing:0.18em; text-transform:uppercase;
+    font-family:'Segoe UI', system-ui, sans-serif; font-weight:700;
+    color:var(--ink); pointer-events:none;
+  }
+  .brand .sub{
+    display:block; margin-top:4px;
+    font-size:11px; letter-spacing:0.1em; font-weight:400;
+    text-transform:none; color:var(--mist);
+  }
+  .contact-bar{
+    position:fixed; top:88px; left:48px; z-index:30;
+    display:flex; flex-direction:column; gap:5px;
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:11.5px; letter-spacing:0.02em;
+  }
+  .contact-bar a{
+    color:var(--mist); text-decoration:none;
+    pointer-events:auto;
+    border-bottom:1px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .contact-bar a:hover{ color:var(--accent); border-color:rgba(95,200,255,0.4); }
+
+  /* ============ STAGE LABEL ============ */
+  .stage-index{
+    position:fixed; top:36px; right:48px; z-index:30;
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:12px; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--mist); text-align:right; pointer-events:none;
+  }
+  .stage-index .num{ color:var(--accent); font-weight:700; }
+
+  /* ============ NARRATIVE TEXT SECTIONS ============ */
+  .stage{
+    position:relative;
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding: 0 8vw;
+    pointer-events:none;
+  }
+  .stage .eyebrow{
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:12px; letter-spacing:0.3em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:14px; opacity:0.9;
+  }
+  .stage h1{
+    font-style:italic; font-weight:400;
+    font-size:clamp(30px, 5vw, 70px);
+    line-height:1.05; margin:0 0 18px 0;
+    max-width:15ch;
+    color:var(--ink);
+  }
+  .stage p{
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:15.5px; line-height:1.75; color:var(--mist);
+    max-width:50ch; margin:0 0 14px 0;
+  }
+  .stage p:last-of-type{ margin-bottom:0; }
+  .stage .tags{
+    margin-top:22px; display:flex; gap:10px; flex-wrap:wrap; max-width:50ch;
+    pointer-events:auto;
+  }
+  .stage .meta-list{
+    margin-top:20px; display:flex; flex-direction:column; gap:7px;
+    font-family:'Segoe UI', system-ui, sans-serif; font-size:12.5px;
+    pointer-events:auto; max-width:50ch;
+  }
+  .stage .meta-list .row{ display:flex; gap:14px; }
+  .stage .meta-list .k{
+    color:var(--accent); min-width:96px; flex:none;
+    letter-spacing:0.05em; text-transform:uppercase; font-size:10.5px; padding-top:2px;
+  }
+  .stage .meta-list .v{ color:var(--ink); line-height:1.5; }
+  #stage-2 .meta-list .row{ justify-content:flex-end; }
+  #stage-2 .meta-list .k{ order:2; }
+  #stage-2 .meta-list .v{ order:1; text-align:right; }
+  .stage .tags span{
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:11.5px; letter-spacing:0.06em;
+    border:1px solid rgba(95,200,255,0.35);
+    color:var(--accent); padding:6px 12px; border-radius:999px;
+    background:rgba(95,200,255,0.06);
+  }
+
+  #stage-2{ align-items:flex-end; text-align:right; }
+  #stage-2 h1, #stage-2 p, #stage-2 .tags{ margin-left:auto; }
+  #stage-2 .tags{ justify-content:flex-end; }
+
+  /* Stage 1 (Core) keeps text up top so the orbit owns the center of the screen */
+  #stage-1{ justify-content:flex-start; padding-top:11vh; }
+  #stage-1 h1{ font-size:clamp(24px, 3.6vw, 44px); margin-bottom:12px; }
+  #stage-1 p{ font-size:14px; line-height:1.55; margin-bottom:9px; }
+  #stage-1 .meta-list{ margin-top:12px; gap:4px; }
+  #stage-1 .meta-list .row{ font-size:11.5px; }
+
+  /* ============ ENTER-SYSTEM BUTTON ============ */
+  .enter-btn{
+    position:fixed; z-index:25;
+    left:50%; bottom:14vh;
+    transform:translateX(-50%);
+    padding:14px 28px;
+    border-radius:999px;
+    border:1px solid rgba(95,200,255,0.5);
+    background:rgba(3,4,10,0.4);
+    backdrop-filter: blur(2px);
+    color:var(--ink);
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:11.5px; letter-spacing:0.18em; text-transform:uppercase;
+    cursor:pointer;
+    opacity:0; pointer-events:none;
+    transition: opacity 0.5s ease, transform 0.25s ease;
+  }
+  .enter-btn:hover{ transform:translateX(-50%) scale(1.05); border-color:var(--accent); }
+  .enter-btn.show{ opacity:1; pointer-events:auto; }
+
+  /* ============ ORBIT SYSTEM (the main feature) ============ */
+  .orbit-stage{
+    position:fixed; left:50%; top:54%; z-index:22;
+    width:0; height:0;
+    opacity:0; pointer-events:none;
+    transition:opacity 0.6s ease;
+  }
+  .orbit-stage.show{ opacity:1; pointer-events:auto; }
+  .orbit-ring{
+    position:absolute; left:0; top:0;
+    transform:translate(-50%,-50%);
+    border:1px dashed rgba(141,151,173,0.18);
+    border-radius:50%;
+    pointer-events:none;
+  }
+  .orbit-hub{
+    position:absolute; left:0; top:0; transform:translate(-50%,-50%);
+    width:14px; height:14px; border-radius:50%;
+    pointer-events:none;
+  }
+  .orbit-card{
+    position:absolute; left:0; top:0;
+    display:flex; align-items:center; gap:8px;
+    padding:8px 14px; border-radius:999px;
+    background:rgba(3,4,10,0.72);
+    border:1px solid rgba(217,180,106,0.4);
+    color:var(--ink); text-decoration:none;
+    font-family:'Segoe UI', system-ui, sans-serif; font-size:12px;
+    white-space:nowrap;
+    backdrop-filter:blur(3px);
+    transition:border-color 0.2s, background 0.2s;
+    will-change: transform, opacity;
+  }
+  .orbit-card:hover{ border-color:var(--amber); background:rgba(3,4,10,0.9); }
+  .orbit-card .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--amber); box-shadow:0 0 6px var(--amber); flex:none;
+  }
+  .orbit-skill{
+    position:absolute; left:0; top:0;
+    padding:6px 12px; border-radius:8px;
+    background:rgba(3,4,10,0.6);
+    border:1px solid rgba(95,200,255,0.32);
+    color:var(--mist); font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:11px; white-space:nowrap;
+    will-change: transform, opacity;
+  }
+  .orbit-caption{
+    position:fixed; left:50%; bottom:13vh; z-index:22;
+    transform:translateX(-50%);
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:11px; letter-spacing:0.06em; color:var(--mist);
+    opacity:0; transition:opacity 0.6s ease; text-align:center;
+  }
+  .orbit-caption.show{ opacity:0.8; }
+  .orbit-caption a{ color:var(--accent); text-decoration:none; border-bottom:1px solid rgba(95,200,255,0.4); }
+
+  /* ============ NAV DIAL ============ */
+  .dial-wrap{
+    position:fixed; right:42px; bottom:42px; z-index:40;
+    width:172px; height:172px;
+    font-family:'Segoe UI', system-ui, sans-serif;
+  }
+  .dial-wrap svg{ width:100%; height:100%; overflow:visible; cursor:grab; touch-action:none; }
+  .dial-wrap.dragging svg{ cursor:grabbing; }
+  .dial-track{ fill:none; stroke:rgba(141,151,173,0.22); stroke-width:1.5; }
+  .dial-fill{ fill:none; stroke:var(--accent); stroke-width:2; stroke-linecap:round;
+    filter:drop-shadow(0 0 4px rgba(95,200,255,0.6)); transition: stroke-dasharray 0.05s linear; }
+  .dial-mark{ fill:var(--mist); }
+  .dial-mark.active{ fill:var(--accent); }
+  .dial-hand{ stroke:var(--amber); stroke-width:2; stroke-linecap:round;
+    filter:drop-shadow(0 0 3px rgba(217,180,106,0.7)); }
+  .dial-hub{ fill:var(--ink); }
+  .dial-label{
+    position:absolute; left:50%; bottom:-6px; transform:translateX(-50%);
+    font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--mist); text-align:center; white-space:nowrap;
+  }
+  .dial-label b{ color:var(--ink); display:block; font-size:11.5px; margin-top:2px; letter-spacing:0.02em;}
+
+  /* ============ NAV ARROWS ============ */
+  .nav-arrows{
+    position:fixed; left:48px; bottom:48px; z-index:40;
+    display:flex; gap:10px;
+    font-family:'Segoe UI', system-ui, sans-serif;
+  }
+  .nav-arrows button{
+    width:42px; height:42px; border-radius:50%;
+    background:transparent; border:1px solid rgba(141,151,173,0.3);
+    color:var(--ink); font-size:16px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .nav-arrows button:hover{ border-color:var(--accent); background:rgba(95,200,255,0.08); }
+  .nav-arrows button:disabled{ opacity:0.3; cursor:default; }
+
+  /* ============ SCROLL HINT ============ */
+  .scroll-hint{
+    position:fixed; left:50%; bottom:40px; transform:translateX(-50%);
+    z-index:25;
+    font-family:'Segoe UI', system-ui, sans-serif;
+    font-size:11px; letter-spacing:0.2em; text-transform:uppercase;
+    color:var(--mist); opacity:0.7;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    transition:opacity 0.4s ease;
+  }
+  .scroll-hint .line{ width:1px; height:28px; background:linear-gradient(var(--accent), transparent); animation:hint-move 1.8s ease-in-out infinite; }
+  @keyframes hint-move{ 0%{opacity:0.2;} 50%{opacity:1;} 100%{opacity:0.2;} }
+
+  @media (max-width:760px){
+    .brand, .stage-index, .contact-bar{ left:24px; right:24px; }
+    .contact-bar{ top:76px; flex-direction:row; flex-wrap:wrap; gap:4px 12px; }
+    .stage{ padding:0 6vw; text-align:left !important; align-items:flex-start !important; }
+    .stage h1, .stage p, .stage .tags{ margin-left:0 !important; }
+    .dial-wrap{ right:18px; bottom:18px; width:128px; height:128px; }
+    .nav-arrows{ left:18px; bottom:18px; }
+    .orbit-card{ font-size:10.5px; padding:6px 10px; }
+    .orbit-skill{ font-size:9.5px; padding:5px 9px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .scroll-hint .line{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+  <canvas id="scene"></canvas>
+
+  <div class="brand">Himanshu Yadav<span class="sub">CSE @ Lovely Professional University · Class of 2029</span></div>
+  <div class="contact-bar">
+    <a href="mailto:himanshuaman92@gmail.com">himanshuaman92@gmail.com</a>
+    <a href="https://github.com/Himanshu-29-tech" target="_blank" rel="noopener">GitHub ↗</a>
+    <a href="https://x.com/himanshu_ji_y" target="_blank" rel="noopener">X ↗</a>
+    <a href="https://himanshuji.hashnode.dev" target="_blank" rel="noopener">Blog ↗</a>
+    <a href="https://www.linkedin.com/in/himanshu-yadav-☕-29ji" target="_blank" rel="noopener">LinkedIn ↗</a>
+  </div>
+  <div class="stage-index"><span class="num" id="stageNum">01</span> / 03<br><span id="stageName">Universe</span></div>
+
+  <button class="enter-btn" id="enterBtn">Enter the System</button>
+
+  <!-- ===================== NARRATIVE SECTIONS ===================== -->
+  <section class="stage" id="stage-0">
+    <div class="eyebrow">Stage 01 — Universe</div>
+    <h1>Himanshu Yadav</h1>
+    <p>Computer Science & Engineering undergraduate, Class of 2029, at Lovely Professional University in Phagwara, Punjab. I learn by building — shipping small, real projects instead of waiting to feel "ready," and writing about what breaks along the way.</p>
+    <p>Somewhere in this system is the one planet everything else orbits. Scroll, or turn the dial below, to find it.</p>
+    <div class="meta-list">
+      <div class="row"><span class="k">Based in</span><span class="v">Phagwara, Punjab, India</span></div>
+      <div class="row"><span class="k">Studying</span><span class="v">B.Tech, Computer Science & Engineering</span></div>
+      <div class="row"><span class="k">University</span><span class="v">Lovely Professional University</span></div>
+      <div class="row"><span class="k">Graduating</span><span class="v">2029</span></div>
+    </div>
+  </section>
+
+  <section class="stage" id="stage-1">
+    <div class="eyebrow">Stage 02 — Core</div>
+    <h1>Everything orbits from here.</h1>
+    <p>This is the core — strong foundations in Python, web development, and the core CS subjects everything else depends on: data structures, databases, and the fundamentals of how software actually runs.</p>
+    <p>Skills sit in close orbit below. Live, working projects orbit further out — click any card to open it, or drag the dial to keep moving through the system.</p>
+    <div class="meta-list">
+      <div class="row"><span class="k">Languages</span><span class="v">Python, C, JavaScript, SQL</span></div>
+      <div class="row"><span class="k">Data / ML</span><span class="v">NumPy & Pandas (strong) · expanding into AI/ML</span></div>
+      <div class="row"><span class="k">Web</span><span class="v">HTML, CSS, JavaScript, Tailwind CSS · learning Next.js</span></div>
+      <div class="row"><span class="k">Tools</span><span class="v">Git, GitHub, VS Code, GitHub Codespaces</span></div>
+    </div>
+  </section>
+
+  <section class="stage" id="stage-2">
+    <div class="eyebrow">Stage 03 — Horizon</div>
+    <h1>What's forming next.</h1>
+    <p>Next up: going deeper into AI/ML, getting fluent in Next.js, and rebuilding my C++ fundamentals properly — DSA, STL, and the low-level understanding that makes everything above it make more sense.</p>
+    <p>First open-source contribution merged — PR #3416 to cake-build/website, fixing a semantic HTML accessibility issue, shipped through a GitHub Codespaces workflow. Most recent write-up: "DOM Manipulation in JavaScript — A Beginner's Cheatsheet," published on my blog with companion posts on LinkedIn and X.</p>
+    <div class="tags">
+      <span>AI / ML</span>
+      <span>Next.js</span>
+      <span>C++</span>
+      <span>Learning in Public</span>
+    </div>
+  </section>
+
+  <!-- ===================== ORBIT SYSTEM ===================== -->
+  <div class="orbit-stage" id="orbitStage">
+    <div class="orbit-ring" id="ringInner"></div>
+    <div class="orbit-ring" id="ringOuter"></div>
+  </div>
+  <div class="orbit-caption" id="orbitCaption">More builds & practice repos → <a href="https://github.com/Himanshu-29-tech" target="_blank" rel="noopener">github.com/Himanshu-29-tech</a></div>
+
+  <!-- ===================== DIAL ===================== -->
+  <div class="dial-wrap" id="dialWrap">
+    <svg viewBox="0 0 172 172">
+      <circle class="dial-track" cx="86" cy="86" r="70"></circle>
+      <path class="dial-fill" id="dialFill" d=""></path>
+      <g id="dialMarks"></g>
+      <line class="dial-hand" id="dialHand" x1="86" y1="86" x2="86" y2="22"></line>
+      <circle class="dial-hub" cx="86" cy="86" r="4"></circle>
+    </svg>
+    <div class="dial-label">Position<b id="dialStageName">Universe</b></div>
+  </div>
+
+  <div class="nav-arrows">
+    <button id="prevBtn" aria-label="Previous stage">←</button>
+    <button id="nextBtn" aria-label="Next stage">→</button>
+  </div>
+
+  <div class="scroll-hint" id="scrollHint"><span class="line"></span>Scroll</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =========================================================================
+   CONTENT CONFIG — edit this block to personalize without touching the
+   Three.js / orbit logic below.
+   ========================================================================= */
+const STAGES = [
+  { key:'universe', name:'Universe' },
+  { key:'core',      name:'Core'     },
+  { key:'horizon',   name:'Horizon'  },
+];
+
+const SKILLS = ['Python', 'NumPy/Pandas', 'JavaScript', 'C', 'SQL', 'Git'];
+
+const PROJECTS = [
+  { label:'Seva_Match',              href:'https://seva-match-1.onrender.com/' },
+  { label:'VotewiseAI',              href:'https://votewise-ai-teal.vercel.app/' },
+  { label:'Carbon Footprint Tracker',href:'https://carbon-footprint-sandy-eta.vercel.app/' },
+  { label:'Coca-Cola Landing Page',  href:'https://cocacola-landing-page-cyan.vercel.app/' },
+];
+
+/* =========================================================================
+   THREE.JS SETUP
+   ========================================================================= */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x03040a, 1);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x03040a, 0.0075);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.set(0, 0, 60);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x2a3550, 1.0));
+const keyLight = new THREE.DirectionalLight(0xdfe8ff, 0.9);
+keyLight.position.set(20, 30, 40);
+scene.add(keyLight);
+const sunLight = new THREE.PointLight(0xdff3ff, 1.4, 600);
+sunLight.position.set(0,0,0);
+scene.add(sunLight);
+const coreLight = new THREE.PointLight(0x5fc8ff, 1.6, 300);
+coreLight.position.set(-15, 10, 25);
+scene.add(coreLight);
+
+/* ---- helper: canvas-based radial glow texture ---- */
+function glowTexture(hex){
+  const size = 256;
+  const c = document.createElement('canvas'); c.width=c.height=size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  g.addColorStop(0, hex+'ff'); g.addColorStop(0.4, hex+'88'); g.addColorStop(1, hex+'00');
+  ctx.fillStyle = g; ctx.fillRect(0,0,size,size);
+  return new THREE.CanvasTexture(c);
+}
+
+/* =========================================================================
+   GROUP 0 — UNIVERSE (sun + orbiting background planets)
+   ========================================================================= */
+const universeGroup = new THREE.Group();
+scene.add(universeGroup);
+
+// starfield
+{
+  const starGeo = new THREE.BufferGeometry();
+  const N = 1400, pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r = 200 + Math.random()*650;
+    const theta = Math.random()*Math.PI*2;
+    const phi = Math.acos((Math.random()*2)-1);
+    pos[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+    pos[i*3+1] = r*Math.sin(phi)*Math.sin(theta);
+    pos[i*3+2] = r*Math.cos(phi);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const starMat = new THREE.PointsMaterial({ color:0xffffff, size:1.1, sizeAttenuation:true, transparent:true, opacity:0.85 });
+  universeGroup.add(new THREE.Points(starGeo, starMat));
+}
+
+// pulsar — a tiny, ultra-dense neutron star with two sweeping beacon beams.
+// Pulsars are nature's most precise clocks, which is the reason this replaces
+// the plain "sun": it's the same idea the growth-dial is built around.
+function beamTexture(){
+  const w = 256, h = 32;
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0,0,w,0);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.15, 'rgba(223,243,255,0.85)');
+  g.addColorStop(1, 'rgba(223,243,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+  return new THREE.CanvasTexture(c);
+}
+function makeBeam(length, width){
+  const geo = new THREE.PlaneGeometry(length, width);
+  geo.translate(length/2, 0, 0); // pivot at the narrow end
+  const mat = new THREE.MeshBasicMaterial({
+    map: beamTexture(), transparent:true, blending:THREE.AdditiveBlending,
+    depthWrite:false, side:THREE.DoubleSide
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+const sunGroup = new THREE.Group(); // kept as the variable name other code refers to
+const pulsarCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(3.2, 3),
+  new THREE.MeshBasicMaterial({ color:0xeaf7ff })
+);
+sunGroup.add(pulsarCore);
+
+const pulsarGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTexture('#dff3ff'), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+pulsarGlow.scale.set(34,34,1);
+sunGroup.add(pulsarGlow);
+
+// twin sweeping beams, crossed in cross-section for a volumetric look
+const beamGroup = new THREE.Group();
+[0, Math.PI].forEach(rot=>{
+  const beamA = makeBeam(95, 5.5);
+  beamA.rotation.y = rot;
+  const beamB = beamA.clone();
+  beamB.rotation.x = Math.PI/2;
+  beamGroup.add(beamA, beamB);
+});
+sunGroup.add(beamGroup);
+
+universeGroup.add(sunGroup);
+
+// decorative orbiting background planets (purely atmospheric)
+const planets = [];
+const planetSpecs = [
+  { r:20, size:1.1, color:0x9fb3c4, speed:0.6  },
+  { r:27, size:1.7, color:0x5fc8ff, speed:0.42 },
+  { r:34, size:0.9, color:0xc97b5e, speed:0.34 },
+  { r:42, size:2.2, color:0xd9b46a, speed:0.22 },
+  { r:50, size:1.4, color:0x8a7fcf, speed:0.17 },
+];
+planetSpecs.forEach(spec=>{
+  const orbit = new THREE.Group();
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(spec.size, 24, 24), new THREE.MeshStandardMaterial({ color:spec.color, roughness:0.55, metalness:0.15 }));
+  mesh.position.x = spec.r;
+  orbit.add(mesh);
+  universeGroup.add(orbit);
+  planets.push({ orbit, speed:spec.speed, angle:Math.random()*Math.PI*2 });
+});
+
+/* =========================================================================
+   GROUP 1 — CORE PLANET (the orbit hub — main feature)
+   ========================================================================= */
+const coreGroup = new THREE.Group();
+scene.add(coreGroup);
+
+const corePlanet = new THREE.Mesh(
+  new THREE.SphereGeometry(9, 48, 48),
+  new THREE.MeshStandardMaterial({ color:0x1c2a4a, roughness:0.5, metalness:0.35, emissive:0x10203f, emissiveIntensity:0.3 })
+);
+coreGroup.add(corePlanet);
+
+const coreAtmo = new THREE.Mesh(
+  new THREE.SphereGeometry(9.6, 48, 48),
+  new THREE.MeshBasicMaterial({ color:0x5fc8ff, transparent:true, opacity:0.18, side:THREE.BackSide })
+);
+coreGroup.add(coreAtmo);
+
+// faint sci-fi ring around the core planet
+const coreRing = new THREE.Mesh(
+  new THREE.RingGeometry(13, 14.4, 64),
+  new THREE.MeshBasicMaterial({ color:0x5fc8ff, side:THREE.DoubleSide, transparent:true, opacity:0.35 })
+);
+coreRing.rotation.x = Math.PI/2 - 0.35;
+coreGroup.add(coreRing);
+
+// two tiny decorative moons orbiting the core planet, for parallax depth under the HTML orbit cards
+const moons = [];
+[ {r:17, size:0.6, color:0xd9b46a, speed:0.5}, {r:22, size:0.4, color:0x9fb3c4, speed:-0.35} ].forEach(spec=>{
+  const orbit = new THREE.Group();
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(spec.size, 16, 16), new THREE.MeshStandardMaterial({ color:spec.color, roughness:0.6 }));
+  mesh.position.x = spec.r;
+  orbit.add(mesh);
+  coreGroup.add(orbit);
+  moons.push({ orbit, speed:spec.speed, angle:Math.random()*Math.PI*2 });
+});
+
+/* =========================================================================
+   GROUP 2 — HORIZON (future: a proto-star forming, with drifting dust)
+   ========================================================================= */
+const horizonGroup = new THREE.Group();
+scene.add(horizonGroup);
+
+const protoStar = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(6, 2),
+  new THREE.MeshBasicMaterial({ color:0xd9b46a })
+);
+horizonGroup.add(protoStar);
+const protoGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTexture('#d9b46a'), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+protoGlow.scale.set(40,40,1);
+horizonGroup.add(protoGlow);
+
+// swirling dust ring forming around the proto-star
+{
+  const N = 500;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const a = Math.random()*Math.PI*2;
+    const r = 10 + Math.random()*14;
+    pos[i*3]   = Math.cos(a)*r;
+    pos[i*3+1] = (Math.random()-0.5)*2.5;
+    pos[i*3+2] = Math.sin(a)*r;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({ color:0xd9b46a, size:0.5, transparent:true, opacity:0.6, blending:THREE.AdditiveBlending, depthWrite:false });
+  const dustRing = new THREE.Points(geo, mat);
+  dustRing.userData.isDustRing = true;
+  horizonGroup.add(dustRing);
+}
+
+/* =========================================================================
+   AMBIENT STARDUST (replaces all earlier plant/leaf elements)
+   ========================================================================= */
+const ambientGroup = new THREE.Group();
+scene.add(ambientGroup);
+{
+  const N = 220;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    pos[i*3]   = (Math.random()-0.5)*120;
+    pos[i*3+1] = (Math.random()-0.5)*120;
+    pos[i*3+2] = (Math.random()-0.5)*80-10;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({ color:0x5fc8ff, size:0.6, transparent:true, opacity:0.3, blending:THREE.AdditiveBlending, depthWrite:false });
+  ambientGroup.add(new THREE.Points(geo, mat));
+}
+
+/* =========================================================================
+   SCROLL / STAGE STATE
+   ========================================================================= */
+const STAGE_COUNT = STAGES.length; // 3
+let progress = 0;
+let targetProgress = 0;
+let systemEntered = false;
+
+function totalScrollable(){
+  return document.body.scrollHeight - window.innerHeight;
+}
+function progressFromScroll(){
+  const t = window.scrollY / Math.max(1, totalScrollable());
+  return THREE.MathUtils.clamp(t, 0, 1) * (STAGE_COUNT-1);
+}
+function scrollFromProgress(p){
+  return (p/(STAGE_COUNT-1)) * totalScrollable();
+}
+
+let isAnimatingScroll = false;
+function animateScrollTo(targetY, duration=900){
+  isAnimatingScroll = true;
+  const startY = window.scrollY;
+  const startT = performance.now();
+  function step(now){
+    const t = Math.min(1, (now-startT)/duration);
+    const eased = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+    window.scrollTo(0, startY + (targetY-startY)*eased);
+    if(t<1) requestAnimationFrame(step);
+    else isAnimatingScroll = false;
+  }
+  requestAnimationFrame(step);
+}
+
+window.addEventListener('scroll', ()=>{
+  if(isAnimatingScroll) return;
+  targetProgress = progressFromScroll();
+  document.getElementById('scrollHint').style.opacity = window.scrollY < 40 ? '0.7' : '0';
+}, { passive:true });
+
+/* =========================================================================
+   GROUP VISIBILITY / BLEND PER FRAME
+   ========================================================================= */
+const groupsByIndex = [universeGroup, coreGroup, horizonGroup];
+
+function applyStageBlend(p){
+  groupsByIndex.forEach((g, idx)=>{
+    const diff = p - idx;
+    const visible = Math.abs(diff) < 1.05;
+    g.visible = visible;
+    if(!visible) return;
+    const fade = 1 - Math.min(1, Math.abs(diff));
+    g.position.y = -diff * 14;
+    const sc = THREE.MathUtils.clamp(fade*0.5+0.6, 0.55, 1.05);
+    g.scale.set(sc,sc,sc);
+  });
+
+  // enter-system button: visible near end of stage 0, hides once entered
+  const enterBtn = document.getElementById('enterBtn');
+  const nearEnd = p > 0.55 && p < 1.0 && !systemEntered;
+  enterBtn.classList.toggle('show', nearEnd);
+
+  // orbit system: visible only on the Core stage
+  const orbitStage = document.getElementById('orbitStage');
+  const orbitCaption = document.getElementById('orbitCaption');
+  const onCore = Math.abs(p-1) < 0.4;
+  orbitStage.classList.toggle('show', onCore);
+  orbitCaption.classList.toggle('show', onCore);
+
+  // text sections fade based on distance from their own scroll slot
+  STAGES.forEach((s,idx)=>{
+    const el = document.getElementById('stage-'+idx);
+    if(!el) return;
+    const diff = Math.abs(p-idx);
+    el.style.opacity = THREE.MathUtils.clamp(1-diff*1.4, 0, 1);
+  });
+
+  const nearest = Math.round(p);
+  document.getElementById('stageNum').textContent = String(nearest+1).padStart(2,'0');
+  document.getElementById('stageName').textContent = STAGES[nearest].name;
+  document.getElementById('dialStageName').textContent = STAGES[nearest].name;
+}
+
+/* =========================================================================
+   ENTER-SYSTEM BUTTON
+   ========================================================================= */
+document.getElementById('enterBtn').addEventListener('click', ()=>{
+  systemEntered = true;
+  document.getElementById('enterBtn').classList.remove('show');
+  animateScrollTo(scrollFromProgress(1), 1100);
+});
+
+/* =========================================================================
+   GROWTH/NAV DIAL (scrubber)
+   ========================================================================= */
+const dialWrap = document.getElementById('dialWrap');
+const dialHand = document.getElementById('dialHand');
+const dialFill = document.getElementById('dialFill');
+const dialMarksG = document.getElementById('dialMarks');
+const CX=86, CY=86, R=70, HAND_LEN=64;
+const START_ANGLE = -150, END_ANGLE = 150;
+const SWEEP = END_ANGLE - START_ANGLE;
+
+function angleForStage(i){ return STAGE_COUNT>1 ? START_ANGLE + (i/(STAGE_COUNT-1))*SWEEP : START_ANGLE; }
+function polar(cx,cy,r,deg){
+  const rad = (deg-90) * Math.PI/180;
+  return [cx + r*Math.cos(rad), cy + r*Math.sin(rad)];
+}
+function arcPath(cx,cy,r,a0,a1){
+  const [x0,y0] = polar(cx,cy,r,a0);
+  const [x1,y1] = polar(cx,cy,r,a1);
+  const large = (a1-a0) > 180 ? 1 : 0;
+  return `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`;
+}
+
+STAGES.forEach((s,i)=>{
+  const ang = angleForStage(i);
+  const [x,y] = polar(CX,CY,R,ang);
+  const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', 3.4);
+  dot.classList.add('dial-mark');
+  dot.dataset.idx = i;
+  dialMarksG.appendChild(dot);
+});
+
+function updateDialVisual(p){
+  const clamped = THREE.MathUtils.clamp(p, 0, STAGE_COUNT-1);
+  const ang = START_ANGLE + (STAGE_COUNT>1 ? (clamped/(STAGE_COUNT-1))*SWEEP : 0);
+  const [hx,hy] = polar(CX,CY,HAND_LEN-22, ang);
+  dialHand.setAttribute('x1', CX); dialHand.setAttribute('y1', CY);
+  dialHand.setAttribute('x2', hx); dialHand.setAttribute('y2', hy);
+  dialFill.setAttribute('d', arcPath(CX,CY,R, START_ANGLE, ang));
+  const nearest = Math.round(clamped);
+  document.querySelectorAll('.dial-mark').forEach(m=>{
+    m.classList.toggle('active', Number(m.dataset.idx)===nearest);
+  });
+}
+
+let dragging = false;
+function angleFromPointer(clientX, clientY){
+  const rect = dialWrap.getBoundingClientRect();
+  const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+  const dx = clientX-cx, dy = clientY-cy;
+  let deg = Math.atan2(dy,dx) * 180/Math.PI + 90;
+  if(deg > 180) deg -= 360;
+  if(deg < -180) deg += 360;
+  return deg;
+}
+function progressFromAngle(deg){
+  const clamped = THREE.MathUtils.clamp(deg, START_ANGLE, END_ANGLE);
+  return ((clamped-START_ANGLE)/SWEEP) * (STAGE_COUNT-1);
+}
+function pointerToProgress(e){
+  const p = e.touches ? e.touches[0] : e;
+  const deg = angleFromPointer(p.clientX, p.clientY);
+  return progressFromAngle(deg);
+}
+dialWrap.addEventListener('pointerdown', (e)=>{
+  dragging = true; dialWrap.classList.add('dragging');
+  systemEntered = true;
+  const p = pointerToProgress(e);
+  targetProgress = p;
+  animateScrollTo(scrollFromProgress(p), 250);
+});
+window.addEventListener('pointermove', (e)=>{
+  if(!dragging) return;
+  const p = pointerToProgress(e);
+  targetProgress = p;
+  window.scrollTo(0, scrollFromProgress(p));
+});
+window.addEventListener('pointerup', ()=>{ dragging=false; dialWrap.classList.remove('dragging'); });
+
+dialMarksG.addEventListener('click', (e)=>{
+  if(e.target.classList.contains('dial-mark')){
+    const idx = Number(e.target.dataset.idx);
+    systemEntered = true;
+    animateScrollTo(scrollFromProgress(idx), 800);
+  }
+});
+
+/* =========================================================================
+   PREV / NEXT NAV
+   ========================================================================= */
+function goToStage(i){
+  i = THREE.MathUtils.clamp(i, 0, STAGE_COUNT-1);
+  systemEntered = true;
+  animateScrollTo(scrollFromProgress(i), 800);
+}
+document.getElementById('prevBtn').addEventListener('click', ()=> goToStage(Math.round(progress)-1));
+document.getElementById('nextBtn').addEventListener('click', ()=> goToStage(Math.round(progress)+1));
+
+/* =========================================================================
+   ORBIT SYSTEM — skills (inner ring) + live projects (outer ring),
+   built and animated entirely in screen space so links are always real,
+   clickable, and crisp (no 3D projection needed).
+   ========================================================================= */
+const orbitStageEl = document.getElementById('orbitStage');
+const ringInnerEl = document.getElementById('ringInner');
+const ringOuterEl = document.getElementById('ringOuter');
+
+const RADIUS_INNER = { x:130, y:62 };
+const RADIUS_OUTER = { x:255, y:118 };
+ringInnerEl.style.width = (RADIUS_INNER.x*2)+'px';
+ringInnerEl.style.height = (RADIUS_INNER.y*2)+'px';
+ringOuterEl.style.width = (RADIUS_OUTER.x*2)+'px';
+ringOuterEl.style.height = (RADIUS_OUTER.y*2)+'px';
+
+const orbitItems = [];
+
+SKILLS.forEach((label, i)=>{
+  const el = document.createElement('div');
+  el.className = 'orbit-skill';
+  el.textContent = label;
+  orbitStageEl.appendChild(el);
+  orbitItems.push({
+    el, radiusX:RADIUS_INNER.x, radiusY:RADIUS_INNER.y,
+    angle: (i/SKILLS.length)*Math.PI*2,
+    speed: 0.12
+  });
+});
+
+PROJECTS.forEach((proj, i)=>{
+  const el = document.createElement('a');
+  el.className = 'orbit-card';
+  el.href = proj.href;
+  el.target = '_blank';
+  el.rel = 'noopener';
+  el.innerHTML = '<span class="dot"></span>' + proj.label;
+  orbitStageEl.appendChild(el);
+  orbitItems.push({
+    el, radiusX:RADIUS_OUTER.x, radiusY:RADIUS_OUTER.y,
+    angle: (i/PROJECTS.length)*Math.PI*2 + 0.5,
+    speed: -0.07
+  });
+});
+
+/* Orbit item angles are advanced directly inside the render loop below. */
+
+/* =========================================================================
+   RESIZE
+   ========================================================================= */
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* =========================================================================
+   RENDER LOOP
+   ========================================================================= */
+let t0 = performance.now();
+function animate(now){
+  requestAnimationFrame(animate);
+  const dt = (now - t0)/1000; t0 = now;
+
+  progress += (targetProgress - progress) * Math.min(1, dt*6);
+  applyStageBlend(progress);
+  updateDialVisual(progress);
+
+  // ambient motion
+  sunGroup.rotation.y += dt*0.05;
+  beamGroup.rotation.y += dt*2.6; // fast sweep — the pulsar's signature
+  const beamAngle = beamGroup.rotation.y;
+  // sharp flash twice per rotation, as if a beam is crossing the camera's line of sight
+  const flash = Math.pow(Math.max(0, Math.cos(beamAngle*2)), 10);
+  sunLight.intensity = 1.1 + flash*2.6;
+  pulsarGlow.material.opacity = 0.75 + flash*0.25;
+  planets.forEach(p=>{
+    p.angle += dt*p.speed*0.25;
+    p.orbit.rotation.y = p.angle;
+  });
+  coreGroup.children.forEach(()=>{}); // no-op, kept for clarity
+  corePlanet.rotation.y += dt*0.08;
+  coreRing.rotation.z += dt*0.02;
+  moons.forEach(m=>{
+    m.angle += dt*m.speed*0.4;
+    m.orbit.rotation.y = m.angle;
+  });
+  protoStar.rotation.y += dt*0.06;
+  horizonGroup.children.forEach(c=>{
+    if(c.userData && c.userData.isDustRing) c.rotation.y += dt*0.15;
+  });
+  ambientGroup.rotation.y += dt*0.01;
+
+  // orbit cards (screen-space trig, only on Core stage)
+  const onCore = Math.abs(progress-1) < 0.45;
+  if(onCore){
+    orbitItems.forEach(item=>{
+      item.angle += dt*item.speed;
+      const x = Math.cos(item.angle)*item.radiusX;
+      const y = Math.sin(item.angle)*item.radiusY;
+      const depth = (Math.sin(item.angle)+1)/2; // 0 = back, 1 = front
+      const scale = 0.82 + depth*0.3;
+      const opacity = 0.4 + depth*0.6;
+      item.el.style.transform = `translate(${x}px, ${y}px) translate(-50%,-50%) scale(${scale})`;
+      item.el.style.opacity = opacity;
+      item.el.style.zIndex = Math.round(depth*10);
+    });
+  }
+
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+/* init */
+targetProgress = progressFromScroll();
+progress = targetProgress;
+applyStageBlend(progress);
+updateDialVisual(progress);
+</script>
+</body>
+</html>
